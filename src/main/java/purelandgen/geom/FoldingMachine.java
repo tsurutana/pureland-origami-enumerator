@@ -17,7 +17,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 
 /**
- * Fold enumerator with per-component physical foldability.
+ * Fold enumerator with per-component reference foldability.
  *
  * Algorithm:
  *  1. Identify BFS components via fold-crease edges that do NOT cross the fold line.
@@ -25,7 +25,7 @@ import java.util.HashSet;
  *     moved-side polygon overlaps C's moved-side polygon (checked on both sides;
  *     applied transitively).
  *  3. For each fold set, re-split from the original figure and determine moved/fixed side.
- *  4. Apply physical foldability check per fold set.
+ *  4. Apply reference foldability check per fold set.
  */
 public class FoldingMachine {
 
@@ -659,7 +659,7 @@ public class FoldingMachine {
     }
 
     // -------------------------------------------------------------------------
-    //  Polygon clipping (kept for physical foldability checks)
+    //  Polygon clipping (kept for reference foldability checks)
     // -------------------------------------------------------------------------
 
     private ArrayList<Vec2> _clipPolygon(Face face, FoldingLine line, boolean useCCW) {
@@ -686,7 +686,7 @@ public class FoldingMachine {
     }
 
     // -------------------------------------------------------------------------
-    //  Physical foldability checks (copied from FoldingMachine)
+    //  Reference foldability checks
     // -------------------------------------------------------------------------
 
     private boolean _isPhysicallyFoldable(Figure original, Figure result, FoldingLine sourceLine) {

@@ -83,7 +83,7 @@ public class ExporterPDF {
                                      int pageFirst, int pageLast, int total,
                                      PDPageContentStream cs) throws IOException {
         PDFont font = PDType1Font.TIMES_ROMAN;
-        String text = String.format("Page %d / %d  (%d – %d of %d)   Pureland Origami Generator 1.3",
+        String text = String.format("Page %d / %d  (%d – %d of %d)   Pureland Origami Generator 1.4",
                 pageNum, totalPages, pageFirst, pageLast, total);
         cs.setNonStrokingColor(0);
         cs.beginText();

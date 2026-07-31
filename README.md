@@ -6,9 +6,9 @@ from a square sheet of paper using Pureland-style folding operations
 
 Given a starting figure, the enumerator generates all possible next folding
 lines (Axiom 1: point-to-point line, Axiom 2: point-to-point match,
-Axiom 3: edge-to-edge match), applies each fold, and filters out results
-that are not physically foldable — i.e. folds that would require passing
-the paper through a landmark hidden by other layers.
+Axiom 3: edge-to-edge match), applies each fold, and filters out judgment
+folds — i.e. folds that would require passing the paper through a landmark
+hidden by other layers, leaving only the reference-foldable results.
 
 ## Requirements
 
@@ -59,6 +59,17 @@ src/main/java/purelandgen/
 ├── matching/                       Shape-matching (Hu moments)
 └── analysis/                       Post-hoc analysis of generated fold graphs
 ```
+
+## Example output
+
+Sample PDF exports (one shape per page, generated via "Save All as PDF...")
+are in [`examples/`](examples/):
+
+- [`1fold_all_4.pdf`](examples/1fold_all_4.pdf) — all shapes after 1 fold
+- [`2fold_all_37.pdf`](examples/2fold_all_37.pdf) — all shapes after 2 folds
+- [`3fold_all_1579.pdf`](examples/3fold_all_1579.pdf) — all shapes after 3 folds
+- [`3fold_foldable_1478.pdf`](examples/3fold_foldable_1478.pdf) — reference
+  foldable shapes after 3 folds
 
 ## Configuration
 

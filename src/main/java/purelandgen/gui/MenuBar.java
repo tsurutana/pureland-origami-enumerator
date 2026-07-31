@@ -12,7 +12,7 @@ public class MenuBar extends JMenuBar {
     public JMenuItem menuItemSaveDB = new JMenuItem("Save as DB...");
     public JMenuItem menuItemSaveClassDBs = new JMenuItem("Save class-based DBs...");
     public JMenuItem menuItemSaveSVG = new JMenuItem("Save as SVG...");
-    public JMenuItem menuItemSavePDF = new JMenuItem("Save All as PDF...");
+    public JMenuItem menuItemSavePDF = new JMenuItem("Export All Figures as PDF...");
     public JMenu menuEdit = new JMenu("Edit");
     public JMenuItem menuItemDelete = new JMenuItem("Delete");
     public JMenu menuView = new JMenu("View");
@@ -23,13 +23,13 @@ public class MenuBar extends JMenuBar {
     // Options menu
     public JMenu menuOptions = new JMenu("Options");
     public JMenu menuConstruction = new JMenu("Construction");
-    public JCheckBoxMenuItem[] constructionItems = new JCheckBoxMenuItem[7];
+    public JCheckBoxMenuItem[] constructionItems = new JCheckBoxMenuItem[3];
     public JMenu menuTechnique = new JMenu("Technique");
     public JCheckBoxMenuItem[] techniqueItems = new JCheckBoxMenuItem[3];
     public JMenu menuSelection = new JMenu("Selection");
     public JCheckBoxMenuItem[] selectionItems = new JCheckBoxMenuItem[5];
-    public JCheckBoxMenuItem menuItemShowFoldable   = new JCheckBoxMenuItem("Physically Foldable");
-    public JCheckBoxMenuItem menuItemShowUnfoldable = new JCheckBoxMenuItem("Physically Unfoldable");
+    public JCheckBoxMenuItem menuItemShowFoldable   = new JCheckBoxMenuItem("Reference Foldable");
+    public JCheckBoxMenuItem menuItemShowUnfoldable = new JCheckBoxMenuItem("Reference Unfoldable");
 
     // Generate menu
     public JMenu menuGenerate = new JMenu("Generate");
@@ -115,10 +115,10 @@ public class MenuBar extends JMenuBar {
         constructionItems[0] = new JCheckBoxMenuItem("Pass through P1 and P2", true);
         constructionItems[1] = new JCheckBoxMenuItem("P1 onto P2", true);
         constructionItems[2] = new JCheckBoxMenuItem("L1 onto L2", true);
-        constructionItems[3] = new JCheckBoxMenuItem("Pass through P1 perpendicular to L1");
-        constructionItems[4] = new JCheckBoxMenuItem("P1 onto L1 passing through P2");
-        constructionItems[5] = new JCheckBoxMenuItem("P1 onto L1 and P2 onto L2");
-        constructionItems[6] = new JCheckBoxMenuItem("P1 onto L1 perpendicular to L2");
+        //constructionItems[3] = new JCheckBoxMenuItem("Pass through P1 perpendicular to L1");
+        //constructionItems[4] = new JCheckBoxMenuItem("P1 onto L1 passing through P2");
+        //constructionItems[5] = new JCheckBoxMenuItem("P1 onto L1 and P2 onto L2");
+        //constructionItems[6] = new JCheckBoxMenuItem("P1 onto L1 perpendicular to L2");
         for (JCheckBoxMenuItem item : constructionItems) {
             menuConstruction.add(item);
         }
@@ -143,7 +143,7 @@ public class MenuBar extends JMenuBar {
             menuSelection.add(item);
         }
 
-        // Options menu - Physical foldability filter
+        // Options menu - Reference foldability filter
         menuOptions.addSeparator();
         menuOptions.add(menuItemShowFoldable);
         menuOptions.add(menuItemShowUnfoldable);
