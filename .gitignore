@@ -1,0 +1,29 @@
+# Build output
+build/
+out/
+.gradle/
+
+# Compiled classes
+*.class
+
+# Generated data files (databases, CSV exports)
+*.db
+*.csv
+
+# Local user configuration (contains machine-specific paths)
+options.ini
+
+# IDE
+.idea/
+*.iml
+
+# Claude Code local state
+.claude/
+
+# Internal notes (not published)
+*.md
+!README.md
+
+# OS
+.DS_Store
+Thumbs.db

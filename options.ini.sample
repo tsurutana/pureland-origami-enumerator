@@ -1,0 +1,10 @@
+# Options configuration
+# Copy this file to options.ini and adjust as needed.
+# options.ini is gitignored because it stores machine-specific paths (lastDirectory).
+
+constructions=1,1,1,0,0,0,0
+techniques=1,1,1
+selections=1,0,0,0,0
+showFoldable=1
+showUnfoldable=0
+lastDirectory=
