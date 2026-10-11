@@ -15,12 +15,12 @@ import java.util.Set;
 
 /**
  * Compares the silhouettes contained in two .db files (A, B) by TRUE exact polygon congruence
- * (ExactSilhouetteGrouping -- see rebuttal/A4_visibility_identity_congruence_summary.md Sec 3),
- * to answer "is every silhouette in B also present in A?". Each DB row is one candidate
- * silhouette; rows within either DB that are themselves mutually congruent are first merged
- * (so internal duplicates in one DB don't inflate the mismatch count), then A's and B's
- * distinct silhouette sets are compared via a single brute-force congruence pass over their
- * union -- same decisive, no-prefilter method as CrossPopulationCheck.
+ * (ExactSilhouetteGrouping), to answer "is every silhouette in B also present in A?". Each DB
+ * row is one candidate silhouette; rows within either DB that are themselves mutually
+ * congruent are first merged (so internal duplicates in one DB don't inflate the mismatch
+ * count), then A's and B's distinct silhouette sets are compared via a single brute-force
+ * congruence pass over their union -- no prefilter bucketing, for the same reason as
+ * FullCongruenceCheck.
  *
  * Usage: ./gradlew compareSilhouetteDbs -Pa=<pathA.db> -Pb=<pathB.db> [-Peps=1e-4]
  */

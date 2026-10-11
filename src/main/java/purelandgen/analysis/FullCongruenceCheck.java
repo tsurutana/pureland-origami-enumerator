@@ -9,32 +9,18 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Follow-up to SilhouetteCongruenceCheck (see rebuttal/silhouette_congruence_check_results.txt):
- * that check only tested for OVER-merging within the EXISTING matchingValue-chain groups (492
- * of them), plus a spot-check of the gap to ADJACENT groups in sorted matchingValue order. It
- * could NOT detect a missed merge between two states whose matchingValue differs enough to land
- * in non-adjacent chain groups -- exactly the failure mode PathGraphAnalyzer's independent
- * exact-congruence run surfaced on a DIFFERENT population (crease-pattern representatives
- * reached via more diverse fold histories): 706 ck-representatives collapsed to 412 true
- * silhouette classes, not ~492 -- a ~16% difference, confirmed by directly, visually inspecting
- * the two largest merges (n=32 and n=27 crease-pattern representatives, all the same shape).
+ * Authoritative, no-shortcuts verification of the three-fold quiz pool's silhouette classes:
+ * runs splitByCongruence() on the ENTIRE population directly, with NO pre-filter bucketing at
+ * all, so a genuine cross-group merge can never be missed by an unsafe invariant choice.
+ * O(n^2) pairs; the fast (single-subpath) path's per-pair cost is small, so this is expected
+ * to complete in well under a minute.
  *
- * EARLIER VERSION OF THIS CHECK (WRONG, kept here as a documented dead end): bucketed by
- * (faces, edges) before running splitByCongruence(), on the theory that it's a discrete,
- * noise-free invariant unlike matchingValue. This is WRONG for silhouette congruence
- * specifically: two states can share the exact same real-world SILHOUETTE while differing in
- * internal crease complexity (e.g. one has extra fold-and-unfold creases from an earlier round
- * that don't touch the outer boundary) -- so they can have DIFFERENT face/edge counts despite
- * being genuinely congruent. Bucketing by (faces,edges) first artificially separates such pairs
- * before they ever get compared, fabricating spurious extra "distinct" classes. Confirmed
- * empirically: that version reported 492 -> 750 with "0 cross-chain merges" -- internally
- * consistent-looking, but a methodology artifact, not a real finding (the fabricated splits are
- * exactly the states whose internal mesh complexity differs despite congruent outlines).
- *
- * This version instead runs splitByCongruence() on the ENTIRE 1429-state population directly,
- * NO pre-filter bucketing at all -- the only way to be certain no genuine cross-group merge is
- * missed by an unsafe invariant choice. O(n^2) ~ 1M pairs; the fast (single-subpath) path's
- * per-pair cost is small, so this is expected to complete in well under a minute.
+ * A pre-filter bucketed by (faces, edges) instead of matchingValue was tried and rejected: two
+ * states can share the exact same real-world SILHOUETTE while differing in internal crease
+ * complexity (e.g. one has extra fold-and-unfold creases from an earlier round that don't
+ * touch the outer boundary), so they can have DIFFERENT face/edge counts despite being
+ * genuinely congruent. Bucketing by (faces, edges) first artificially separates such pairs
+ * before they are ever compared, fabricating spurious extra "distinct" classes.
  *
  * Usage: ./gradlew fullCongruenceCheck
  */

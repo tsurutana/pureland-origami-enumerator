@@ -9,7 +9,6 @@ import java.util.List;
 
 /**
  * Exact, layer-order-and-symmetry-aware duplicate-elimination key for a folded Figure.
- * See rebuttal/A2_exact_key_spec.md for the design rationale.
  *
  * A folding state is fully determined by:
  *  - the crease pattern: the complete planar subdivision of the original flat square,
@@ -159,9 +158,9 @@ public final class ExactStateKey {
      *
      * Two states with the same crease pattern differ, if at all, only in which faces are
      * folded valley vs mountain -- so this key is exactly "same fold line(s), direction(s)
-     * aside" and is intended for perceptual-graph path counting (rebuttal/recompute_plan.md
-     * S2.1: a silhouette-preserving valley/mountain choice does not create a new discoverable
-     * quiz path), NOT for shape-identity dedup (use {@link #compute} there).
+     * aside" and is intended for perceptual-graph path counting (a silhouette-preserving
+     * valley/mountain choice does not create a new discoverable quiz path), NOT for
+     * shape-identity dedup (use {@link #compute} there).
      */
     public static String computeCreasePatternKey(Figure fig) {
         final int n = fig.faces.size();

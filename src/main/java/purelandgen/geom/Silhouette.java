@@ -24,8 +24,7 @@ public class Silhouette {
      * グループ分けは {@link ExactSilhouetteGrouping}（matchingValueチェインによる高速な
      * 事前バケット分け → バケット内を厳密ポリゴン合同判定で細分）を使う。単純な
      * matchingValueチェインだけでは、たまたま近い値になった異なるシルエットを誤って
-     * 同一視してしまうことが確認されている（rebuttal/A4_visibility_identity_congruence_summary.md
-     * Sec 3 参照）。
+     * 同一視してしまうことが確認されている。
      *
      * hasMultiPath は FoldingMachine が設定するため本メソッドでは変更しない。
      * MAKECREASE は他のクリースバリアントと同一シルエットになり得るが、

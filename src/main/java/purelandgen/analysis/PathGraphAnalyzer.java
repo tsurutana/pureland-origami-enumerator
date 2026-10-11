@@ -23,7 +23,7 @@ import java.util.*;
  *   hard    : A = 1 ∧ D ≥ 1
  *   removed : A = 0 (有効なヒントが存在しない)
  *
- * 知覚グラフ（rebuttal/recompute_plan.md S2.1）との対応:
+ * 知覚グラフとの対応:
  *   - Gen-1/Gen-2 は状態の完全同一視（ExactStateKey）のみで重複除去する。山谷折りは
  *     R（重なり順）が異なるため別状態として保持する ── 3手目でどちらが可視/可折になるかが
  *     山谷ごとに変わりうるため、2手目時点では両方を残しておく必要がある。
@@ -40,8 +40,7 @@ import java.util.*;
  *     には全ステップでの線識別の追跡が要り、今回のスコープ外）。山/谷マージは全体の96.5%を
  *     占めるため、この残差は小さいと想定。
  *
- * T/H シルエット同一性 (Reviewer #2, 2nd round, Sec 4.4 scalar-descriptor conflation concern;
- * see rebuttal/silhouette_congruence_check_results.txt):
+ * T/H シルエット同一性（scalar descriptorによる誤分類を避けるため）:
  *   T・H とも ExactSilhouetteGrouping（厳密多角形合同判定、D4×flip 正規化 + Procrustes
  *   最適回転、閾値1e-4）による分類のみを真実とする。スカラー記述子（matchingValue）の
  *   事前バケット化（旧 addGroup/findGroup、SIL_TOL=1e-6）は一切使わない ── 挿入順依存の
@@ -168,10 +167,10 @@ public class PathGraphAnalyzer {
         // （ExactStateKey.computeCreasePatternKey() 自身のjavadocが明記: "NOT for
         // shape-identity dedup"）。このため、別々のGen-2親から得られた、本当は無関係な
         // （シルエットも異なる）クリースパターンが、たまたま同じ ck 文字列になる衝突が
-        // 実際に発生することを確認済み（CrossPopulationCheck: 706個のck代表の厳密T分類が
-        // 412個にしかならず、1429状態の全数検証（493、見逃しマージ0件）と比べて81個の
-        // シルエットが丸ごと欠落していた。欠落した全ケースで「別Gen-2親のck代表」が
-        // rawGapで数万〜無限大という、明らかに別形状の値を示した）。
+        // 実際に発生することを確認済み（706個のck代表を厳密T分類すると412個にしかならず、
+        // 1429状態の全数検証（493、見逃しマージ0件）と比べて81個のシルエットが丸ごと
+        // 欠落していた。欠落した全ケースで「別Gen-2親のck代表」がrawGapで数万〜無限大
+        // という、明らかに別形状の値を示した）。
         //
         // 対策: ck による「親をまたいだ」代表Figureの統合は行わない（ローカルな重複除去
         // ――同一親内でのv/m統合――にのみ ck を使う）。全ての (親, ck) 代表Figureを

@@ -11,12 +11,12 @@ import java.util.ArrayList;
  * Supports the paper's Sec 4.4 claim: "recomputing the enumeration with the descriptor
  * tolerance varied from 10^-6 to 10^-12 leaves the state counts unchanged at every fold
  * depth". Figure.SD_TOLERANCE (the floor used by Figure.epsilonEqual(), which backs the
- * fast (sd, face count, edge count) bucket pre-filter -- see
- * rebuttal/A2_exact_key_spec.md) is swept over {1e-6, 1e-8, 1e-10, 1e-12} at each fold depth,
- * under REQUIRE_EXACT_KEY=true (the production default -- see FoldingMachine.
- * REQUIRE_EXACT_KEY's javadoc), since the paper's claim is specifically that the bucket
- * pre-filter's tolerance doesn't matter BECAUSE the exact comparison decides every merge;
- * a sweep under the old, non-exact key would not support that claim.
+ * fast (sd, face count, edge count) bucket pre-filter) is swept over
+ * {1e-6, 1e-8, 1e-10, 1e-12} at each fold depth, under REQUIRE_EXACT_KEY=true (the production
+ * default -- see FoldingMachine.REQUIRE_EXACT_KEY's javadoc), since the paper's claim is
+ * specifically that the bucket pre-filter's tolerance doesn't matter BECAUSE the exact
+ * comparison decides every merge; a sweep under the old, non-exact key would not support that
+ * claim.
  *
  * Only Figure.SD_TOLERANCE is varied here. GeomUtil.EPS itself is left untouched, so the
  * fold-splitting / visibility geometry that decides *which* figures get generated in the
@@ -25,10 +25,10 @@ import java.util.ArrayList;
  *
  * Usage: ./gradlew toleranceSweep
  *
- * Runtime: depth 4 under the exact key is expensive (~1 hour per enumeration per
- * rebuttal/exact_key_enumeration_results.txt), so a full 4-tolerance x depth-4 sweep is
- * expected to take on the order of several hours; depths 1-3 complete in seconds. Consider
- * running detached (e.g. a background terminal) rather than interactively.
+ * Runtime: depth 4 under the exact key takes on the order of an hour per enumeration, so a
+ * full 4-tolerance x depth-4 sweep is expected to take on the order of several hours; depths
+ * 1-3 complete in seconds. Consider running detached (e.g. a background terminal) rather than
+ * interactively.
  */
 public class ToleranceSweep {
 
@@ -96,6 +96,6 @@ public class ToleranceSweep {
         System.out.println();
         System.out.println("Done. If every tolerance row for a given depth shows the same "
                 + "total/foldable/unfoldable, the state counts do not depend on the bucket "
-                + "pre-filter tolerance at that depth (see rebuttal/A2_exact_key_spec.md).");
+                + "pre-filter tolerance at that depth.");
     }
 }

@@ -8,11 +8,11 @@ import java.util.ArrayList;
 import static org.junit.Assert.*;
 
 /**
- * Validation test for ExactStateKey, per rebuttal/A2_exact_key_spec.md section 6.
+ * Validation test for ExactStateKey.
  *
  * Folds a square in half 3 times to an 1/8-area, 2:1-footprint stack, along 4 sequences
  * that are all reachable from the same first fold (fixed arbitrarily as "H", a horizontal
- * fold line, per the spec's note that the first fold is symmetric):
+ * fold line -- the first fold is symmetric, so this loses no generality):
  *
  *   H-H-V (mountain)   same crease pattern as H-H-V (valley), differs only in layer order
  *   H-H-V (valley)

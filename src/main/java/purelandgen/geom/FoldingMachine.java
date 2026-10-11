@@ -69,13 +69,11 @@ public class FoldingMachine {
     /** When true, both the in-memory dedup path (_addIfDescripterIsDifferent) and the SQLite
      *  streaming path additionally require ExactStateKey equality before merging two figures
      *  that already match on the fast (sd, face count, edge count) bucket key -- the fast key
-     *  alone can conflate states that have the same geometry but a different layer order (see
-     *  rebuttal/A2_exact_key_spec.md), discarding a valid, possibly-foldable layer
-     *  configuration. Default true: this is the production default going forward. NOTE this
-     *  means a fresh enumeration (including the GUI's default behavior) no longer reproduces
-     *  the paper's published tab:counts/tab:silhouettes numbers exactly (those were computed
-     *  with this off, before this key existed) -- see the README's "Reproducing the paper's
-     *  reported numbers" section for the known, small, intentional delta this causes. */
+     *  alone can conflate states that have the same geometry but a different layer order,
+     *  discarding a valid, possibly-foldable layer configuration. Default true: this is the
+     *  production default. See the README's "Reproducing the paper's reported numbers"
+     *  section for how to reproduce a count under the older (fast-key-only) methodology
+     *  instead, when that's specifically what's needed. */
     public static boolean REQUIRE_EXACT_KEY = true;
 
     // Streaming state (non-null when streaming mode is active)

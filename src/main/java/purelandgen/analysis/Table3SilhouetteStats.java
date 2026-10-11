@@ -9,18 +9,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Reproduces Table 3's (tab:silhouettes) three-fold "quiz pool" silhouette statistics, under
- * the exact, layer-order-aware state key (purelandgen.geom.ExactStateKey -- the production
- * default since FoldingMachine.REQUIRE_EXACT_KEY=true; see rebuttal/A2_exact_key_spec.md and
- * the README's "Reproducing the paper's reported numbers" section for why this no longer
- * matches the published 1,004/903/312/35/492/442 exactly). Also run at 2 folds as a sanity
- * check (no state should be eliminated there, matching Table 2/tab:counts).
+ * Reproduces the three-fold "quiz pool" silhouette statistics, under the exact, layer-order-
+ * aware state key (purelandgen.geom.ExactStateKey -- the production default, see
+ * FoldingMachine.REQUIRE_EXACT_KEY). Also run at 2 folds as a sanity check (no state should be
+ * eliminated there).
  *
  * Distinct-silhouette counts here come straight from the same true exact-polygon congruence
- * grouping Silhouette.computeProperties() now uses internally (purelandgen.geom.
- * ExactSilhouetteGrouping -- see rebuttal/A4_visibility_identity_congruence_summary.md Sec 3),
- * not a scalar shape descriptor. For an independent, no-shortcuts verification that this fast
- * (bucket-then-refine) grouping never misses a cross-bucket merge, see fullCongruenceCheck.
+ * grouping Silhouette.computeProperties() uses internally (purelandgen.geom.
+ * ExactSilhouetteGrouping), not a scalar shape descriptor. For an independent, no-shortcuts
+ * verification that this fast (bucket-then-refine) grouping never misses a cross-bucket
+ * merge, see fullCongruenceCheck.
  *
  * Usage: ./gradlew table3SilhouetteStats
  */

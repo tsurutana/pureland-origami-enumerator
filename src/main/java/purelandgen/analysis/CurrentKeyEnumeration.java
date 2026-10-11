@@ -8,29 +8,20 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 
 /**
- * Re-measures Table 2's (tab:counts) shape counts under the CURRENT (non-exact) duplicate-
- * elimination key -- i.e. the same key/settings Table 2's published numbers (1,579 / 241,303 /
- * 98,804,718 at 3/4/5 folds) were originally computed with, before the exact-key work existed.
- * This re-runs that same methodology (Axioms 1-3, valley+mountain+crease enabled at every
- * round, crease-only operations excluded at the 5th fold only, only isFoldable states carried
- * forward between rounds) with today's codebase, to check whether this session's two
- * FoldingMachine visibility-check fixes (see rebuttal/A2_exact_key_spec.md -- GeomUtil.isRange
- * EPS tolerance, and Axiom 1's crease-vs-visible-edge-overlap check) move Table 2's numbers at
- * all, independently of the separate exact-key question.
+ * Measures shape counts under the OLDER, non-exact duplicate-elimination key (bucketing by
+ * (sd, face count, edge count) alone, with no further layer-order check) -- the methodology
+ * an earlier version of this enumeration used, before ExactStateKey existed. Useful for
+ * comparing against today's default (FoldingMachine.REQUIRE_EXACT_KEY=true, ExactKeyEnumeration)
+ * to see how much the layer-order-aware key changes the per-fold counts.
  *
- * REQUIRE_EXACT_KEY is explicitly forced false here (the field's current default is true,
- * which is convenient for the exact-key rebuttal scripts but is NOT what Table 2 was computed
- * with) and reset to false again in the finally block regardless.
+ * REQUIRE_EXACT_KEY is explicitly forced false here (overriding the field's true default) and
+ * reset to false again in the finally block regardless.
  *
  * Mirrors ExactKeyEnumeration.java's structure; see that class for the DISPLAY_CAP/streaming
- * notes. depth=4 is already a ~300x larger population than the 3-fold quiz pool (435,467
- * states under the exact key at that depth; the current key is expected to be in the same
- * ballpark), so a single run is expected to take on the order of the paper's reported 16
- * minutes (crease excluded at fold 4) -- consider redirecting output and running detached.
+ * notes.
  *
- * Usage:
- *   ./gradlew currentKeyEnumeration4Fold
- *   ./gradlew currentKeyEnumeration4Fold -Pdepth=3    (cheap sanity check, matches 1,579 total)
+ * Usage: ./gradlew currentKeyEnumeration4Fold (the registered Gradle task hardcodes depth=4;
+ * the class itself also accepts plain "depth=N"/"out=path" arguments when run directly).
  */
 public class CurrentKeyEnumeration {
 

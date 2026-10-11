@@ -8,7 +8,7 @@ public class Vertex {
     public boolean isMovable = true;
     public Vertex copyTo;
 
-    /** Position on the original, never-folded flat square (see ExactStateKey / rebuttal/A2_exact_key_spec.md).
+    /** Position on the original, never-folded flat square (see ExactStateKey).
      *  Defaults to p at construction time -- correct for the initial square's corners, and a documented
      *  best-effort fallback for vertices whose fold lineage is unknown (FoldFormat-loaded figures,
      *  OrigamiConstructions' scratch floating vertices). Vertices created by splitting an edge during an

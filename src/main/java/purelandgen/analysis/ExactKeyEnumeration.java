@@ -8,35 +8,32 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 
 /**
- * Measures 4- and 5-fold enumeration under the exact key (Table 1 methodology: Axioms 1-3,
- * valley+mountain+crease enabled at every round, only crease-only (fold-and-unfold) operations
- * excluded at the 5th fold specifically -- per the paper's Table 1 caption, NOT "excluded at
- * the target depth" like the 3-fold quiz-pool rule LayerOrderMergeAnalysis uses for Table 3).
- * Only isFoldable states are carried forward between rounds, matching MainFrame.enumerate().
+ * Measures 4- and 5-fold enumeration under the exact key (Axioms 1-3, valley+mountain+crease
+ * enabled at every round, only crease-only (fold-and-unfold) operations excluded at the 5th
+ * fold specifically -- NOT "excluded at the target depth" like the 3-fold quiz-pool rule
+ * Table3SilhouetteStats uses). Only isFoldable states are carried forward between rounds,
+ * matching MainFrame.enumerate().
  *
- * Reports aggregate counts only (Total/Foldable/Unfoldable per depth, matching Table 1's
- * columns) and per-round timing -- no per-figure DB export, so this stays cheap regardless of
- * how many states a round produces. See rebuttal/layer_order_merge_results.txt for the 2-3
- * fold cross-check this extends, and for the known DISPLAY_CAP/streaming-path notes below.
+ * Reports aggregate counts only (Total/Foldable/Unfoldable per depth) and per-round timing --
+ * no per-figure DB export, so this stays cheap regardless of how many states a round produces.
  *
- * Usage:
- *   ./gradlew exactKeyEnumeration                  (depth 4)
- *   ./gradlew exactKeyEnumeration -Pdepth=5         (depth 5)
- *   ./gradlew exactKeyEnumeration -Pdepth=5 -Pout=rebuttal/exact_key_5fold.txt
+ * Usage: ./gradlew exactKeyEnumeration4Fold / exactKeyEnumeration5Fold (both hardcode their
+ * depth and output path in build.gradle; the class itself also accepts plain "depth=N"/
+ * "out=path" arguments when run directly).
  *
- * Notes on scale (see rebuttal/layer_order_merge_results.txt "Timing" section):
- *   - ExactStateKey.compute() measured ~18.7x slower per candidate than the current key at
- *     3 folds. That cost is paid per candidate regardless of depth, so 4/5-fold runtime is
- *     expected to grow by roughly this factor over the paper's reported 16 min / 13.6 h,
- *     before accounting for the exact key also keeping more states alive (it kept +42% more
- *     at 3 folds), which independently increases the candidate count at the next depth.
+ * Notes on scale:
+ *   - ExactStateKey.compute() is substantially slower per candidate than a simple scalar-key
+ *     comparison, and the exact key also keeps more states alive per round (it correctly
+ *     distinguishes states a scalar key would wrongly merge), which independently increases
+ *     the candidate count at the next depth. Expect 4-fold runs on the order of an hour and
+ *     5-fold runs on the order of a day; consider running detached.
  *   - DISPLAY_CAP is raised to Integer.MAX_VALUE for every round except the last, so the
  *     carried-forward set is never silently truncated (the default 200,000 cap would
- *     otherwise truncate a >200,000-state round, e.g. today's 241,303-state 4-fold round,
- *     before it reaches the next depth). For the LAST round only, DISPLAY_CAP is set to 0:
- *     since there is no further round to carry into, the figures themselves are not needed,
- *     only the counts -- FoldingMachine skips the (potentially huge) reload from SQLite in
- *     that case and reports counts via a direct SQL COUNT instead.
+ *     otherwise truncate a large round before it reaches the next depth). For the LAST round
+ *     only, DISPLAY_CAP is set to 0: since there is no further round to carry into, the
+ *     figures themselves are not needed, only the counts -- FoldingMachine skips the
+ *     (potentially huge) reload from SQLite in that case and reports counts via a direct SQL
+ *     COUNT instead.
  */
 public class ExactKeyEnumeration {
 

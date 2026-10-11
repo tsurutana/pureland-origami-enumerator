@@ -14,22 +14,11 @@ import java.util.Map;
 
 /**
  * Groups figures by TRUE silhouette congruence (translation + rotation + reflection, no
- * scaling -- matching the paper's Sec 4.4 "congruence classes" definition), instead of
- * {@link Silhouette#computeProperties}'s single scalar descriptor (matchingValue =
- * log(mu20+mu02)) and its sorted-scan CHAIN threshold, which can -- and, confirmed empirically
- * in the 3-fold quiz pool, does -- conflate two genuinely different silhouettes that happen to
- * land within the chain's reach of each other (Reviewer #2, 2nd round, on Sec 4.4 / Discussion
- * "Remaining approximation in classification"; see rebuttal/silhouette_congruence_check_
- * results.txt for the full investigation this was extracted from, including three tool bugs
- * found and fixed along the way -- NOT bugs in the enumeration itself -- before arriving at
- * this validated method).
- *
- * This is deliberately a SEPARATE, analysis-only utility: {@link Silhouette#computeProperties}
- * itself (used by MainFrame/the GUI and every other production code path) is left untouched
- * for this rebuttal cycle. Porting this method into Silhouette.java for production use is a
- * decided but DEFERRED follow-up, planned for the public-release pass (see the project memory
- * note recorded 2026-10-06) -- not done now, to avoid changing GUI/production behavior before
- * the paper deadline.
+ * scaling), instead of a single scalar shape descriptor (matchingValue = log(mu20+mu02))
+ * compared via a sorted-scan chain threshold, which can -- and, confirmed empirically in the
+ * 3-fold quiz pool, does -- conflate two genuinely different silhouettes that happen to land
+ * within the chain's reach of each other. Used internally by
+ * {@link Silhouette#computeProperties}.
  *
  * Method: bucket candidates first by the existing scalar descriptor (matchingValue, same 1e-6
  * chain as Silhouette.computeProperties() -- safe as a fast PRE-filter only, since the smallest
@@ -56,8 +45,9 @@ public final class ExactSilhouetteGrouping {
 
     /** Validated threshold (sheet-coordinate units / dimensionless relative-area, see class
      *  javadoc) -- comfortably above the confirmed noise ceiling, comfortably below genuine
-     *  shape differences. Do not lower without re-running the stress test in
-     *  SilhouetteCongruenceCheck (tight/loose/looser sweep) first. */
+     *  shape differences. Do not lower without re-checking against a range of tighter/looser
+     *  values first (confirm no genuinely-congruent pair falls outside the new threshold, and
+     *  no genuinely-distinct pair falls inside it). */
     public static final double DEFAULT_EPS = 1.0e-4;
 
     private static final double COLLINEAR_POS_TOL = 1.0e-4;
@@ -141,8 +131,8 @@ public final class ExactSilhouetteGrouping {
 
     // ---- continuous discrepancy between two silhouettes (epsilon-independent) ----
 
-    /** Exposed for diagnostics only (e.g. CrossPopulationCheck) -- the raw, continuous,
-     *  epsilon-independent discrepancy between two silhouettes. See {@link #splitByCongruence}. */
+    /** Exposed for diagnostics only -- the raw, continuous, epsilon-independent discrepancy
+     *  between two silhouettes. See {@link #splitByCongruence}. */
     public static double rawGap(Figure fa, Figure fb) {
         return gap(fa, fb);
     }
@@ -221,9 +211,8 @@ public final class ExactSilhouetteGrouping {
         return out;
     }
 
-    // java.awt.geom.Area's PathIterator is NOT consistent about how it closes a subpath (see
-    // SilhouetteCongruenceCheck's javadoc for the full story) -- only drop the last point when
-    // it actually duplicates the first.
+    // java.awt.geom.Area's PathIterator is NOT consistent about how it closes a subpath --
+    // only drop the last point when it actually duplicates the first.
     private static List<Point2D> dropClosingDuplicate(List<Point2D> closedLoop) {
         int n = closedLoop.size();
         if (n >= 2 && closedLoop.get(0).distance(closedLoop.get(n - 1)) < 1e-9) {
