@@ -42,3 +42,83 @@ task pathAnalysis(type: JavaExec) {
     args = project.hasProperty('out') ? [project.property('out')] : ['path_graph.csv']
     jvmArgs '-Xmx4g'
 }
+
+// Reproduces Table 3's (tab:silhouettes) three-fold quiz-pool silhouette statistics, and
+// cross-checks Silhouette.computeProperties()'s grouping against true exact-polygon
+// congruence. See Table3SilhouetteStats.java javadoc.
+task table3SilhouetteStats(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    main = 'purelandgen.analysis.Table3SilhouetteStats'
+    jvmArgs '-Xmx6g'
+}
+
+// Supports Sec 4.4's claim that the sd bucket pre-filter's tolerance (1e-6..1e-12) does not
+// affect the state counts, under the exact key. Depth 4 is expensive (~1h per enumeration);
+// the full 4-tolerance sweep can take several hours -- consider running detached. See
+// ToleranceSweep.java javadoc.
+task toleranceSweep(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    main = 'purelandgen.analysis.ToleranceSweep'
+    args = ['out=rebuttal/tolerance_sweep_results.csv']
+    jvmArgs '-Xmx16g'
+}
+
+// Authoritative verification of Table 3's silhouette counts: brute-force, no-shortcuts check
+// that every pair among the 1,429 three-fold states is correctly grouped by true polygon
+// congruence (no scalar-descriptor bucketing shortcut that could hide a missed merge). See
+// FullCongruenceCheck.java javadoc.
+task fullCongruenceCheck(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    main = 'purelandgen.analysis.FullCongruenceCheck'
+    jvmArgs '-Xmx6g'
+}
+
+// Measures 4/5-fold enumeration under the exact key (the production default). Two fixed-depth
+// tasks (no -P property -- on this machine, -Pdepth always resolved to 0 regardless of what
+// was passed, for reasons never root-caused; hardcoding the depth per task sidesteps it
+// entirely). Both append to rebuttal/exact_key_enumeration_results.txt. See
+// ExactKeyEnumeration.java for expected runtime/memory -- depth 5 in particular may take on
+// the order of days; consider redirecting output and running detached (e.g. `nohup ... &` or
+// a background terminal) rather than in an interactive shell.
+task exactKeyEnumeration4Fold(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    main = 'purelandgen.analysis.ExactKeyEnumeration'
+    args = ['depth=4', 'out=rebuttal/exact_key_enumeration_results.txt']
+    jvmArgs '-Xmx16g'
+}
+
+task exactKeyEnumeration5Fold(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    main = 'purelandgen.analysis.ExactKeyEnumeration'
+    args = ['depth=5', 'out=rebuttal/exact_key_enumeration_results.txt']
+    jvmArgs '-Xmx16g'
+}
+
+// Re-measures Table 2 (tab:counts) under the ORIGINAL (non-exact) key -- the methodology/
+// settings its published numbers (1,579 / 241,303 at 3/4 folds) were actually computed with.
+// Since FoldingMachine.REQUIRE_EXACT_KEY now defaults to true (see its javadoc), a plain
+// enumeration (including the GUI) no longer reproduces those published numbers; this task is
+// how to regenerate them specifically, on today's codebase. See CurrentKeyEnumeration.java.
+// Depth 4 is a ~300x larger population than the 3-fold quiz pool; expect on the order of the
+// paper's reported 16 minutes -- consider running detached. Appends to
+// rebuttal/current_key_enumeration_results.txt.
+task currentKeyEnumeration4Fold(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    main = 'purelandgen.analysis.CurrentKeyEnumeration'
+    args = ['depth=4', 'out=rebuttal/current_key_enumeration_results.txt']
+    jvmArgs '-Xmx16g'
+}
+
+// Compares the silhouettes contained in two .db files (A, B) by exact polygon congruence:
+// is every silhouette in B also present in A? See SilhouetteDbCompare.java.
+// Usage: ./gradlew compareSilhouetteDbs -Pa=<pathA.db> -Pb=<pathB.db> [-Peps=1e-4]
+task compareSilhouetteDbs(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    main = 'purelandgen.analysis.SilhouetteDbCompare'
+    args = [
+        'a=' + (project.hasProperty('a') ? project.property('a') : ''),
+        'b=' + (project.hasProperty('b') ? project.property('b') : ''),
+        'eps=' + (project.hasProperty('eps') ? project.property('eps') : '')
+    ]
+    jvmArgs '-Xmx4g'
+}

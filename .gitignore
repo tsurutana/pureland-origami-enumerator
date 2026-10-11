@@ -24,6 +24,11 @@ options.ini
 *.md
 !README.md
 
+# Paper drafts, reviewer correspondence, and rendered figure PDFs -- never for public release
+*.pdf
+*.tex
+rebuttal/
+
 # OS
 .DS_Store
 Thumbs.db
