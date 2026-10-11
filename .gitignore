@@ -29,6 +29,9 @@ options.ini
 *.tex
 rebuttal/
 
+# ...except the example output figures, which are meant to be published
+!examples/*.pdf
+
 # OS
 .DS_Store
 Thumbs.db
