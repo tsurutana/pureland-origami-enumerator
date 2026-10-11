@@ -114,8 +114,8 @@ are in [`examples/`](examples/):
 
 - [`1fold_all_4.pdf`](examples/1fold_all_4.pdf) — all shapes after 1 fold
 - [`2fold_all_37.pdf`](examples/2fold_all_37.pdf) — all shapes after 2 folds
-- [`3fold_all_1579.pdf`](examples/3fold_all_1579.pdf) — all shapes after 3 folds
-- [`3fold_foldable_1478.pdf`](examples/3fold_foldable_1478.pdf) — reference
+- [`3fold_all_2016.pdf`](examples/3fold_all_2016.pdf) — all shapes after 3 folds
+- [`3fold_foldable_1794.pdf`](examples/3fold_foldable_1794.pdf) — reference
   foldable shapes after 3 folds
 
 ## Configuration
