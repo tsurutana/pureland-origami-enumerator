@@ -15,13 +15,19 @@ public class FoldFormat {
     public String[] file_classes = {"singleModel"};
     public int previous_index;
     public ArrayList<double[]> vertices_coords;
+    // Original (never-folded) position of each vertex, parallel to vertices_coords.
+    // Absent (null) in files written before this field existed; Figure(FoldFormat) leaves
+    // Vertex.origP at its fallback (== folded p) in that case -- see Vertex.origP javadoc.
+    public ArrayList<double[]> vertices_origP;
     public ArrayList<int[]> faces_vertices;
 
     public FoldFormat(Figure figure) {
         previous_index = figure.prev;
         vertices_coords = new ArrayList<>();
+        vertices_origP = new ArrayList<>();
         for (Vertex v : figure.vertices) {
             vertices_coords.add(new double[]{v.p.x, v.p.y});
+            vertices_origP.add(new double[]{v.origP.x, v.origP.y});
         }
         faces_vertices = new ArrayList<>();
         for (Face f : figure.faces) {

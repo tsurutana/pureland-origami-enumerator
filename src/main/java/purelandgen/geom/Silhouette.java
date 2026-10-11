@@ -4,11 +4,10 @@ import purelandgen.matching.MomentOperator;
 
 import java.awt.geom.Area;
 import java.awt.geom.GeneralPath;
-import java.awt.geom.PathIterator;
-import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.List;
 import java.util.ListIterator;
 
 public class Silhouette {
@@ -18,12 +17,18 @@ public class Silhouette {
      * 各図形の isUniqueSilhouette / silhouetteGroupSize をセットする。図形リストの
      * 順序・内容は変えない（除去なし）。
      *
-     * - isUniqueSilhouette=true  : 同一 matchingValue がこの群に1件だけ（かつ非MAKECREASE）
-     * - isUniqueSilhouette=false : 同一 matchingValue が複数 or MAKECREASE
-     * - silhouetteGroupSize      : 同一 matchingValue のグループ件数
+     * - isUniqueSilhouette=true  : このシルエット合同クラスに可折かつ非MAKECREASEのメンバーが1件だけ
+     * - isUniqueSilhouette=false : 同クラスに複数 or MAKECREASE
+     * - silhouetteGroupSize      : 同クラスのメンバー件数
+     *
+     * グループ分けは {@link ExactSilhouetteGrouping}（matchingValueチェインによる高速な
+     * 事前バケット分け → バケット内を厳密ポリゴン合同判定で細分）を使う。単純な
+     * matchingValueチェインだけでは、たまたま近い値になった異なるシルエットを誤って
+     * 同一視してしまうことが確認されている（rebuttal/A4_visibility_identity_congruence_summary.md
+     * Sec 3 参照）。
      *
      * hasMultiPath は FoldingMachine が設定するため本メソッドでは変更しない。
-     * MAKECREASE は他のクリースバリアントと同一 matchingValue になるが、
+     * MAKECREASE は他のクリースバリアントと同一シルエットになり得るが、
      * クリースパターンが異なる独立した図形なので常に isUniqueSilhouette=false。
      *
      * NOTE: ストリーミングモードでの hasMultiPath 完全対応は未実装。
@@ -33,31 +38,16 @@ public class Silhouette {
         for (Figure f : figures)
             f.matchingValue = MomentOperator.getMatchingValue(getSilhouette(f));
 
-        // インデックス配列のみをソートしてグループを検出（figures 本体の順序は保持）
-        int n = figures.size();
-        ArrayList<Integer> sortedIdx = new ArrayList<>(n);
-        for (int i = 0; i < n; i++) sortedIdx.add(i);
-        sortedIdx.sort((a, b) -> Double.compare(figures.get(a).matchingValue, figures.get(b).matchingValue));
-
-        int i = 0;
-        while (i < n) {
-            double mv = figures.get(sortedIdx.get(i)).matchingValue;
-            int j = i + 1;
-            while (j < n && Math.abs(figures.get(sortedIdx.get(j)).matchingValue - mv) < 1e-6)
-                j++;
-            int groupSize = j - i;
+        List<List<Figure>> groups = ExactSilhouetteGrouping.group(figures);
+        for (List<Figure> group : groups) {
             int foldableCount = 0;
-            for (int k = i; k < j; k++) {
-                Figure f = figures.get(sortedIdx.get(k));
+            for (Figure f : group)
                 if (f.isFoldable && !_isMakeCrease(f)) foldableCount++;
-            }
-            for (int k = i; k < j; k++) {
-                Figure f = figures.get(sortedIdx.get(k));
-                f.silhouetteGroupSize = groupSize;
+            for (Figure f : group) {
+                f.silhouetteGroupSize = group.size();
                 f.isUniqueSilhouette = f.isFoldable && !_isMakeCrease(f) && (foldableCount == 1);
                 f.silhouettePropertiesComputed = true;
             }
-            i = j;
         }
     }
 
@@ -159,31 +149,5 @@ public class Silhouette {
             area.add(new Area(p2d));
         }
         return area;
-    }
-
-    // Pathから頂点のリストへ変換
-    private static ArrayList<Point2D> _getPoint2DlistfromPathIterator(PathIterator pi) {
-
-        ArrayList<Point2D> ret = new ArrayList<>();
-        Point2D m = null, p, q = new Point2D.Double(Double.MAX_VALUE, Double.MAX_VALUE);
-
-        double[] coords = new double[6];
-        while (!pi.isDone()) {
-            int type = pi.currentSegment(coords);
-            p = new Point2D.Double(coords[0], coords[1]);
-            if (p.distance(q) > 1.E-12) {
-                if (type == PathIterator.SEG_MOVETO) {
-                    m = p;
-                    ret.add(m);
-                } else if (type == PathIterator.SEG_LINETO) {
-                    ret.add(p);
-                    q = p;
-                } else if (type == PathIterator.SEG_CLOSE) {
-                    ret.add(new Point2D.Double(m.getX(), m.getY()));
-                }
-            }
-            pi.next();
-        }
-        return ret;
     }
 }

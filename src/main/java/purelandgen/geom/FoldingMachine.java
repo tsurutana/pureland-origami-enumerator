@@ -33,8 +33,11 @@ public class FoldingMachine {
     static final double MINIMUM_FOLDABLE_WIDTH = 2.0 / 3.0;
     static Comparator<Face> depthComparator = (o1, o2) -> Integer.compare(o1.index, o2.index);
 
-    static final int STREAM_THRESHOLD = 200000;
-    static final int DISPLAY_CAP      = 200000;
+    // Mutable (not final) and public so test/analysis harnesses can temporarily lower these to
+    // force streaming mode on a small dataset, e.g. to validate the streaming dedup path against
+    // a known-good in-memory result. Production default: 200000.
+    public static int STREAM_THRESHOLD = 200000;
+    public static int DISPLAY_CAP      = 200000;
 
     private static class FoldSetResult {
         final ArrayList<ArrayList<Integer>> foldSets;    // CCW+CW combined (duplicates removed)
@@ -59,12 +62,32 @@ public class FoldingMachine {
     boolean[] constructions;
     boolean[] techs;
 
-    public int lastTotalCount = 0;  // actual unique figures generated (before display cap)
+    public int lastTotalCount = 0;     // actual unique figures generated (before display cap)
+    public long lastFoldableCount = 0; // via SQL COUNT when streamed (exact, not cap-limited);
+                                        // via generated.stream() otherwise
+
+    /** When true, both the in-memory dedup path (_addIfDescripterIsDifferent) and the SQLite
+     *  streaming path additionally require ExactStateKey equality before merging two figures
+     *  that already match on the fast (sd, face count, edge count) bucket key -- the fast key
+     *  alone can conflate states that have the same geometry but a different layer order (see
+     *  rebuttal/A2_exact_key_spec.md), discarding a valid, possibly-foldable layer
+     *  configuration. Default true: this is the production default going forward. NOTE this
+     *  means a fresh enumeration (including the GUI's default behavior) no longer reproduces
+     *  the paper's published tab:counts/tab:silhouettes numbers exactly (those were computed
+     *  with this off, before this key existed) -- see the README's "Reproducing the paper's
+     *  reported numbers" section for the known, small, intentional delta this causes. */
+    public static boolean REQUIRE_EXACT_KEY = true;
 
     // Streaming state (non-null when streaming mode is active)
     private int _totalStreamCount = 0;
     private StreamSQliteDB.Writer _dbWriter = null;
     private String _tempDbPath = null;
+    // Set once per FoldOnce() call, at the same time storeGeometry is decided (see
+    // _switchToStreaming): true for a round whose figures are never reloaded (DISPLAY_CAP<=0),
+    // meaning the exact_key column only needs to support equality lookups, not inspection -- so
+    // a 128-bit hash (ExactStateKey.hashHex()) is stored/compared instead of the full encoded
+    // key text, which can itself be as large as the figure's geometry (see hashHex() javadoc).
+    private boolean _compactKeyMode = false;
 
     public FoldingMachine(boolean[] constructions, boolean[] techs) {
         this.constructions = constructions;
@@ -76,20 +99,31 @@ public class FoldingMachine {
         _totalStreamCount = 0;
         _dbWriter = null;
         _tempDbPath = null;
+        _compactKeyMode = false;
         for (Figure d : figures) {
             _possibleFoldingLines = OrigamiConstructions.getPossibleFoldingLines(d, constructions);
             _makeFoldedFigures(d, _possibleFoldingLines);
             currentIndex++;
+            // Progress by INPUT figures consumed (e.g. how many of the prior round's shapes have
+            // been expanded so far), not by output rows written -- the input count is known and
+            // grows monotonically, unlike the output count whose eventual total is unknown ahead of time.
+            if (currentIndex % 10000 == 0) {
+                System.out.println("Progress: " + currentIndex + " / " + figures.size() + " input figures processed...");
+            }
         }
         if (_dbWriter != null) {
             try { _dbWriter.close(); } catch (Exception e) { e.printStackTrace(); }
             lastTotalCount = _totalStreamCount;
+            long[] counts = StreamSQliteDB.countByFoldable(_tempDbPath);
+            lastFoldableCount = counts[1] >= 0 ? counts[1] : -1;
             System.out.println("Streaming complete. DB: " + lastTotalCount
                     + " figures at: " + _tempDbPath);
+            if (DISPLAY_CAP <= 0) return new ArrayList<>(); // caller only wants the counts above
             ArrayList<Figure> display = StreamSQliteDB.load(_tempDbPath, DISPLAY_CAP);
             return display != null ? display : new ArrayList<>();
         }
         lastTotalCount = generated.size();
+        lastFoldableCount = generated.stream().filter(f -> f.isFoldable).count();
         return generated;
     }
 
@@ -704,18 +738,28 @@ public class FoldingMachine {
 
     private boolean _isPhysicallyFoldableAxiom1(Figure original, Figure result,
                                                   FoldingLine sourceLine) {
-        if (!(_isPointVisibleInFigure(sourceLine.p0, original)
-                || _isPointVisibleInFigure(sourceLine.p0, result))) return false;
-        if (!(_isPointVisibleInFigure(sourceLine.p1, original)
-                || _isPointVisibleInFigure(sourceLine.p1, result))) return false;
+        if (!(_isLandmarkVisibleInFigure(sourceLine.p0, sourceLine.p0SourceEdges, original)
+                || _isLandmarkVisibleInFigure(sourceLine.p0, sourceLine.p0SourceEdges, result))) return false;
+        if (!(_isLandmarkVisibleInFigure(sourceLine.p1, sourceLine.p1SourceEdges, original)
+                || _isLandmarkVisibleInFigure(sourceLine.p1, sourceLine.p1SourceEdges, result))) return false;
         FoldingLine crease = result.foldingLine;
-        if (_figureHasEdge(sourceLine.p0, sourceLine.p1, original)) {
-            // Fold line lies along an existing paper edge: non-trivial overlap is sufficient.
-            return _creaseOverlapsLandmarkSegment(sourceLine.p0, sourceLine.p1, crease.p0, crease.p1);
+        boolean hasEdge = _figureHasEdge(sourceLine.p0, sourceLine.p1, original);
+        boolean ret;
+        if (hasEdge) {
+            // Fold line lies along an existing paper edge: non-trivial overlap is sufficient,
+            // but ONLY within a VISIBLE part of that edge -- otherwise the crease could sit
+            // entirely in a hidden middle section while skipping over a visible part (or even
+            // the one landmark endpoint it never actually reaches), which would not be
+            // physically identifiable/foldable even though p0 and p1 themselves are each
+            // individually visible (checked above). Mirrors Axiom 3's _checkContact, which
+            // already applies this same visible-overlap / endpoints-only distinction.
+            ret = _creaseOverlapsVisiblePartOfEdge(sourceLine.p0, sourceLine.p1, crease.p0, crease.p1, original);
+        } else {
+            // No edge between the two points: crease must pass through both endpoints.
+            ret = _isPointOnSegmentLenient(sourceLine.p0, crease.p0, crease.p1)
+                && _isPointOnSegmentLenient(sourceLine.p1, crease.p0, crease.p1);
         }
-        // No edge between the two points: crease must pass through both endpoints.
-        return _isPointOnSegmentLenient(sourceLine.p0, crease.p0, crease.p1)
-            && _isPointOnSegmentLenient(sourceLine.p1, crease.p0, crease.p1);
+        return ret;
     }
 
     private static boolean _figureHasEdge(Vec2 p0, Vec2 p1, Figure fig) {
@@ -737,6 +781,37 @@ public class FoldingMachine {
         return overlapLen > CREASE_TOL;
     }
 
+    // Same as _creaseOverlapsLandmarkSegment, but additionally requires the overlap to fall
+    // within a VISIBLE part of the landmark edge [p0,p1] in `original` -- a raw length-only
+    // overlap check would accept a crease that sits entirely under a hidden middle section of
+    // the edge (never reaching, or even touching the visible part of, either landmark point),
+    // which isn't physically identifiable even though p0/p1 are each individually visible.
+    // Mirrors Axiom 3's _checkContact / _isEndpointsOnlyVisible handling of the same situation.
+    private boolean _creaseOverlapsVisiblePartOfEdge(Vec2 p0, Vec2 p1, Vec2 cp0, Vec2 cp1, Figure original) {
+        ArrayList<Face> upper = _getUpperLayersForEdge(p0, p1, original);
+        if (upper == null) return _creaseOverlapsLandmarkSegment(p0, p1, cp0, cp1);
+        ArrayList<double[]> visSegs = GeomUtil.getVisibleSegments(p0, p1, upper);
+        if (visSegs.isEmpty()) {
+            // Only the two endpoints themselves can be visible (if at all) -- require the
+            // crease to actually reach both, same as the no-existing-edge case.
+            return _isPointOnSegmentLenient(p0, cp0, cp1) && _isPointOnSegmentLenient(p1, cp0, cp1);
+        }
+        double dx = p1.x - p0.x, dy = p1.y - p0.y;
+        double len2 = dx * dx + dy * dy;
+        if (len2 < GeomUtil.EPS * GeomUtil.EPS) return false;
+        double lenScale = Math.sqrt(len2);
+        double tc0 = ((cp0.x - p0.x) * dx + (cp0.y - p0.y) * dy) / len2;
+        double tc1 = ((cp1.x - p0.x) * dx + (cp1.y - p0.y) * dy) / len2;
+        double cMin = Math.max(0.0, Math.min(tc0, tc1));
+        double cMax = Math.min(1.0, Math.max(tc0, tc1));
+        for (double[] vis : visSegs) {
+            double lo = Math.max(cMin, vis[0]);
+            double hi = Math.min(cMax, vis[1]);
+            if ((hi - lo) * lenScale > CREASE_TOL) return true;
+        }
+        return false;
+    }
+
     private static final double CREASE_TOL = 1.0;
 
     private static boolean _isPointOnSegmentLenient(Vec2 p, Vec2 sp, Vec2 ep) {
@@ -755,8 +830,8 @@ public class FoldingMachine {
     private boolean _isPhysicallyFoldableAxiom2(Figure original, Figure result,
                                                   FoldingLine sourceLine) {
         Vec2 p0 = sourceLine.landmark0, p1 = sourceLine.landmark1;
-        if (!_isPointVisibleInFigure(p0, original)) return false;
-        if (!_isPointVisibleInFigure(p1, original)) return false;
+        if (!_isLandmarkVisibleInFigure(p0, sourceLine.landmark0SourceEdges, original)) return false;
+        if (!_isLandmarkVisibleInFigure(p1, sourceLine.landmark1SourceEdges, original)) return false;
         // Mesh vertex check: did any vertex physically move from p0→p1 or p1→p0?
         // Handles symmetric folds where both points are in the fold set (count stays equal).
         int nv = Math.min(original.vertices.size(), result.vertices.size());
@@ -910,43 +985,102 @@ public class FoldingMachine {
         return Math.min(maxA, maxB) - Math.max(minA, minB) > GeomUtil.EPS;
     }
 
+    // p can simultaneously be: a REAL mesh vertex in some faces (an edge was split there,
+    // e.g. along L1), AND a merely-on-the-interior point of a DIFFERENT, unrelated edge in
+    // other faces (e.g. L2, never split at this location). The two cases need DIFFERENT
+    // hiding rules and must BOTH be checked (AND), not treated as mutually-exclusive
+    // fallbacks -- treating them as exclusive (the previous version of this method) let
+    // whichever case was found FIRST silently skip the other's hiding check entirely.
+    //
+    //  - Vertex case: p equals he.vertex.p for face F (a real endpoint). Combine ALL such
+    //    faces via the MIN layer among them, then check everything strictly above. Safe
+    //    without any pair-exclusion gymnastics because isPointHiddenByFace()'s own paired-
+    //    edge rule already excludes exact endpoints, so an immediately-adjacent pair face
+    //    can never falsely hide an endpoint this way.
+    //  - Edge-interior case: p lies strictly inside an edge (sp,ep), matching neither
+    //    endpoint. The endpoint-exclusion above does NOT apply here, so each DISTINCT such
+    //    edge needs its OWN local-max exclusion (_getUpperLayersForEdge, the same per-edge
+    //    convention already used for Axiom 3's segment visibility) checked independently --
+    //    a single GLOBAL max across unrelated edges would let one edge's own topmost reach
+    //    "clear" the point even when a DIFFERENT edge through the same point is genuinely
+    //    hidden by layers between that edge and the (unrelated) global max.
     private boolean _isPointVisibleInFigure(Vec2 p, Figure fig) {
         int minVertexLayer = Integer.MAX_VALUE;
+        ArrayList<Vec2[]> edgesThroughP = new ArrayList<>();
         for (Face f : fig.faces) {
             Halfedge he = f.halfedge;
             do {
-                if (he.vertex.p.epsilonEqual(p)) {
+                Vec2 sp = he.vertex.p, ep = he.next.vertex.p;
+                if (sp.epsilonEqual(p)) {
                     minVertexLayer = Math.min(minVertexLayer, f.index);
-                    break;
+                } else if (!ep.epsilonEqual(p) && GeomUtil.isPointOnSegment(p, sp, ep)) {
+                    boolean already = false;
+                    for (Vec2[] e : edgesThroughP) {
+                        if ((e[0].epsilonEqual(sp) && e[1].epsilonEqual(ep))
+                         || (e[0].epsilonEqual(ep) && e[1].epsilonEqual(sp))) { already = true; break; }
+                    }
+                    if (!already) edgesThroughP.add(new Vec2[]{sp, ep});
                 }
                 he = he.next;
             } while (he != f.halfedge);
         }
+        if (minVertexLayer == Integer.MAX_VALUE && edgesThroughP.isEmpty()) return false;
+
         if (minVertexLayer != Integer.MAX_VALUE) {
             ArrayList<Face> upper = new ArrayList<>();
             for (Face f : fig.faces)
                 if (f.index > minVertexLayer) upper.add(f);
-            return GeomUtil.isPointVisible(p, upper);
+            if (!GeomUtil.isPointVisible(p, upper)) return false;
         }
-        // Construction-added edge intersection: on a face edge but not at a mesh vertex.
-        // Use MAX layer (topmost face with the point on its edge) so that the shared
-        // fold-crease edge's pair face is not incorrectly treated as an upper layer.
-        int maxEdgeLayer = Integer.MIN_VALUE;
-        for (Face f : fig.faces) {
-            Halfedge he = f.halfedge;
-            do {
-                if (GeomUtil.isPointOnSegment(p, he.vertex.p, he.next.vertex.p)) {
-                    maxEdgeLayer = Math.max(maxEdgeLayer, f.index);
-                    break;
-                }
-                he = he.next;
-            } while (he != f.halfedge);
+        for (Vec2[] e : edgesThroughP) {
+            ArrayList<Face> upper = _getUpperLayersForEdge(e[0], e[1], fig);
+            if (upper == null || !GeomUtil.isPointVisible(p, upper)) return false;
         }
-        if (maxEdgeLayer == Integer.MIN_VALUE) return false;
-        ArrayList<Face> upper = new ArrayList<>();
-        for (Face f : fig.faces)
-            if (f.index > maxEdgeLayer) upper.add(f);
-        return GeomUtil.isPointVisible(p, upper);
+        return true;
+    }
+
+    // Visibility check for a landmark that may be a FLOATING intersection point (Axiom 1's
+    // p0/p1, Axiom 2's landmark0/1 -- never Axiom 3's landmark0-3, which are always real edge
+    // endpoints). sourceEdges is non-null exactly when the landmark was built from such a point
+    // (Vertex.sourceEdges / FoldingLine.p0SourceEdges etc.); in that case, visibility is checked
+    // ONLY against those remembered construction-time edges -- not a fresh scan of whichever
+    // edges happen to pass through the same coordinate in `fig` (that scan is what
+    // _isPointVisibleInFigure's edge-interior branch does, and it can misfire: a coincidentally-
+    // overlapping edge belonging to a face that's merely in the OTHER edge's "upper" set can
+    // trigger isPointHiddenByFace's own-crease exclusion rule, which is meant for a real vertex
+    // pinched in a fold, not for an unrelated point that happens to cross that crease -- see the
+    // mountain-fold visibility investigation). For a real-vertex landmark, sourceEdges is null
+    // and this falls back to the existing, unchanged _isPointVisibleInFigure.
+    private boolean _isLandmarkVisibleInFigure(Vec2 p, Vec2[][] sourceEdges, Figure fig) {
+        if (sourceEdges == null) return _isPointVisibleInFigure(p, fig);
+        boolean foundAny = false;
+        for (Vec2[] edge : sourceEdges) {
+            ArrayList<Face> upper = _getUpperLayersForEdge(edge[0], edge[1], fig);
+            if (upper == null) continue; // this source edge isn't present in `fig` (e.g. its face moved by this fold) -- not applicable here
+            foundAny = true;
+            if (!_isPointOnVisiblePartOfEdge(p, edge[0], edge[1], upper)) return false;
+        }
+        return foundAny;
+    }
+
+    // Whether p (assumed to lie on segment [sp,ep]) falls within a VISIBLE portion of it, using
+    // the same interval-subtraction machinery as Axiom 1/3's segment-overlap checks
+    // (GeomUtil.getVisibleSegments) instead of a direct isPointHiddenByFace(p, f) point check --
+    // the interval approach naturally treats a point sitting exactly on the boundary between a
+    // hidden and a visible sub-interval as visible (consistent with "touching is OK"), whereas
+    // isPointHiddenByFace's own-crease exclusion rule would wrongly flag it hidden if that exact
+    // boundary happens to coincide with an upper face's unrelated crease edge.
+    private static boolean _isPointOnVisiblePartOfEdge(Vec2 p, Vec2 sp, Vec2 ep, ArrayList<Face> upper) {
+        ArrayList<double[]> visSegs = GeomUtil.getVisibleSegments(sp, ep, upper);
+        if (visSegs.isEmpty()) return false;
+        double dx = ep.x - sp.x, dy = ep.y - sp.y;
+        double len2 = dx * dx + dy * dy;
+        if (len2 < GeomUtil.EPS * GeomUtil.EPS) return false;
+        double t = ((p.x - sp.x) * dx + (p.y - sp.y) * dy) / len2;
+        for (double[] vis : visSegs) {
+            if (t >= vis[0] - GeomUtil.EPS && t <= vis[1] + GeomUtil.EPS) return true;
+        }
+        return false;
     }
 
     // -------------------------------------------------------------------------
@@ -1078,35 +1212,42 @@ public class FoldingMachine {
         if (_dbWriter != null) {
             // Streaming mode: duplicate matching via SQLite's sd_index (seenSd/seenSdFoldable are not used)
             boolean aIsMC = a.foldingLine != null && a.foldingLine.type == FoldingLine.MAKECREASE;
-            double sdEps = Math.max(Math.abs(a.sd) * 1e-9, GeomUtil.EPS);
+            double sdEps = Math.max(Math.abs(a.sd) * 1e-9, Figure.SD_TOLERANCE);
             int faces = a.faces.size(), edges = a.edges.size();
+            // Computed unconditionally (needed either way: to query for a match, or to store on
+            // insert). REQUIRE_EXACT_KEY=false still narrows by exact_key="" via the query below
+            // (all rows share that value), preserving today's sd/faces/edges-only behavior exactly.
+            String aKey = !REQUIRE_EXACT_KEY ? "" :
+                    _compactKeyMode ? ExactStateKey.compute(a).hashHex() : ExactStateKey.compute(a).toString();
             try {
-                int[] existing = _dbWriter.findExisting(a.sd, faces, edges, sdEps);
+                int[] existing = _dbWriter.findExisting(a.sd, faces, edges, aKey, sdEps);
                 if (existing != null) {
                     boolean existingIsMC = existing[1] == 1;
                     if (!aIsMC && existingIsMC) {
                         // valley/mountain fold (a) replaces MAKECREASE (existing)
-                        _dbWriter.replace(a.sd, faces, edges, a, sdEps);
+                        _dbWriter.replace(a.sd, faces, edges, a, aKey, sdEps);
                     } else if (!aIsMC && !existingIsMC && a.isFoldable && existing[0] == 0) {
                         // same type on both sides: foldable replaces unfoldable
-                        _dbWriter.replace(a.sd, faces, edges, a, sdEps);
+                        _dbWriter.replace(a.sd, faces, edges, a, aKey, sdEps);
                     }
                     // aIsMC && !existingIsMC -> discard MAKECREASE (do nothing)
                     return false;
                 }
-                // new figure (sd mismatch, or same sd but different face/edge count)
+                // new figure (sd mismatch, or same sd/faces/edges but a new exact_key)
                 _totalStreamCount++;
-                _dbWriter.writeNow(a);
+                _dbWriter.writeNow(a, aKey);
             } catch (Exception e) { e.printStackTrace(); }
             return true;
         }
 
         // In-memory mode
+        ExactStateKey aKey = REQUIRE_EXACT_KEY ? ExactStateKey.compute(a) : null;
         for (int i = 0; i < figures.size(); i++) {
             Figure b = figures.get(i);
             if (a.epsilonEqual(b)
                     && a.faces.size() == b.faces.size()
-                    && a.edges.size() == b.edges.size()) {
+                    && a.edges.size() == b.edges.size()
+                    && (!REQUIRE_EXACT_KEY || aKey.equals(ExactStateKey.compute(b)))) {
                 boolean aIsMC = a.foldingLine != null && a.foldingLine.type == FoldingLine.MAKECREASE;
                 boolean bIsMC = b.foldingLine != null && b.foldingLine.type == FoldingLine.MAKECREASE;
                 if (aIsMC && !bIsMC) {
@@ -1146,12 +1287,20 @@ public class FoldingMachine {
         try {
             _tempDbPath = System.getProperty("user.dir")
                     + File.separator + "pureland_" + System.currentTimeMillis() + ".db";
-            _dbWriter = new StreamSQliteDB.Writer(_tempDbPath);
+            // DISPLAY_CAP<=0 means the caller (see FoldOnce) never reloads this round's figures --
+            // only countByFoldable()'s SQL COUNT is read back -- so (a) skip serializing geometry
+            // into the "data" column, and (b) store a 128-bit hash instead of the full encoded
+            // exact_key text (see ExactStateKey.hashHex() javadoc) -- both are by far the largest
+            // per-row costs for deep/large rounds, and neither is needed once only counts matter.
+            _compactKeyMode = DISPLAY_CAP <= 0;
+            _dbWriter = new StreamSQliteDB.Writer(_tempDbPath, !_compactKeyMode);
             _totalStreamCount = 0;
             for (Figure f : figures) {
                 // No duplicate check needed here, since duplicates were already removed at the in-memory stage
                 _totalStreamCount++;
-                _dbWriter.writeNow(f);
+                String key = !REQUIRE_EXACT_KEY ? "" :
+                        _compactKeyMode ? ExactStateKey.compute(f).hashHex() : ExactStateKey.compute(f).toString();
+                _dbWriter.writeNow(f, key);
             }
             figures.clear();
             System.out.println("Switched to streaming mode. " + _totalStreamCount

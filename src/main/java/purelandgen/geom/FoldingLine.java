@@ -20,6 +20,18 @@ public class FoldingLine {
     Vec2 landmark2 = null; // second landmark segment endpoint (Axiom 3)
     Vec2 landmark3 = null;
 
+    /** Non-null only when the corresponding landmark (p0/p1 for Axiom 1, landmark0/1 for Axiom
+     *  2) was built from a FLOATING intersection vertex (Vertex.sourceEdges) rather than a real
+     *  mesh vertex -- i.e. Axiom 3's landmark0-3 are always real edge endpoints and never set
+     *  these. Each non-null array holds the (up to 2) existing-figure edges whose crossing
+     *  produced that point; see Vertex.sourceEdges' javadoc and
+     *  FoldingMachine._isLandmarkVisibleInFigure for why visibility must be checked against
+     *  exactly these edges, not a fresh scan of the whole figure. */
+    Vec2[][] p0SourceEdges;
+    Vec2[][] p1SourceEdges;
+    Vec2[][] landmark0SourceEdges;
+    Vec2[][] landmark1SourceEdges;
+
     /** Sources that can discover this folding line */
     public ArrayList<ConstructionSource> sources = new ArrayList<>();
 
@@ -50,6 +62,10 @@ public class FoldingLine {
         if (fl.landmark1 != null) landmark1 = new Vec2(fl.landmark1);
         if (fl.landmark2 != null) landmark2 = new Vec2(fl.landmark2);
         if (fl.landmark3 != null) landmark3 = new Vec2(fl.landmark3);
+        p0SourceEdges = fl.p0SourceEdges;
+        p1SourceEdges = fl.p1SourceEdges;
+        landmark0SourceEdges = fl.landmark0SourceEdges;
+        landmark1SourceEdges = fl.landmark1SourceEdges;
     }
 
     /**

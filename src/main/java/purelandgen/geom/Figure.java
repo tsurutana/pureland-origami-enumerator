@@ -23,6 +23,13 @@ public class Figure {
     public boolean silhouettePropertiesComputed = false; // whether computeProperties() has been run
     public boolean isFoldable = true;
 
+    /** Floor tolerance for sd-based duplicate elimination (see epsilonEqual()).
+     *  Defaults to GeomUtil.EPS to preserve existing behavior. Overridable (e.g. via
+     *  a system property read at harness startup) so its effect on enumeration counts
+     *  can be stress-tested independently of the shared geometric epsilon used
+     *  elsewhere (point/line comparisons, degenerate-area checks, etc.). */
+    public static double SD_TOLERANCE = GeomUtil.EPS;
+
     public Figure(double w, double h) {
         final double hw = w / 2;
         final double hh = h / 2;
@@ -63,8 +70,16 @@ public class Figure {
     }
 
     public Figure(FoldFormat file) {
-        for (double[] v : file.vertices_coords) {
-            vertices.add(new Vertex(v[0], v[1]));
+        boolean hasOrigP = file.vertices_origP != null
+                && file.vertices_origP.size() == file.vertices_coords.size();
+        for (int i = 0; i < file.vertices_coords.size(); i++) {
+            double[] v = file.vertices_coords.get(i);
+            Vertex vertex = new Vertex(v[0], v[1]);
+            if (hasOrigP) {
+                double[] o = file.vertices_origP.get(i);
+                vertex.origP = new Vec2(o[0], o[1]);
+            } // else: leave origP at its fallback (== folded p), per Vertex.origP javadoc
+            vertices.add(vertex);
         }
         for (int[] indexes : file.faces_vertices) {
             Vertex[] vlist = new Vertex[indexes.length];
@@ -193,7 +208,7 @@ public class Figure {
     boolean epsilonEqual(Figure fig) {
         final double dif = Math.abs(sd - fig.sd);
         final double scale = Math.max(sd, fig.sd);
-        return dif < Math.max(scale * 1e-9, GeomUtil.EPS);
+        return dif < Math.max(scale * 1e-9, SD_TOLERANCE);
     }
 
     // Sets shape to the sum of distances from the barycenter to each vertex

@@ -11,12 +11,9 @@ public class MomentOperator {
 	public static final int FRONT = 1;
 
 	public static double getMatchingValue(Area area) {
-		ArrayList<Point2D> plist = getPoint2DlistfromPathIterator(area.getPathIterator(null));
-		Point2D center = HuMoments.getCentroid(plist);
-		for (Point2D p : plist)
-			p.setLocation(p.getX() + center.getX(), p.getY() + center.getY());
-		return _getMatchingValueCongruence(plist);   // 合同判定（デフォルト）
-		// return _getMatchingValueSimilarity(plist); // 相似判定に切り替える場合
+		ArrayList<ArrayList<Point2D>> subpaths = getSubpaths(area.getPathIterator(null));
+		return _getMatchingValueCongruence(subpaths);   // 合同判定（デフォルト）
+		// return _getMatchingValueSimilarity(subpaths); // 相似判定に切り替える場合
 	}
 
 	/**
@@ -24,8 +21,8 @@ public class MomentOperator {
 	 * mu20+mu02（2次中心モーメントのトレース）を面積で正規化しない。
 	 * 折りの深さが異なると面積が変わるため、相似な結果でも別形状として区別される。
 	 */
-	private static double _getMatchingValueCongruence(ArrayList<Point2D> plist) {
-		double[] moments = HuMoments.getHuMoments(plist);
+	private static double _getMatchingValueCongruence(ArrayList<ArrayList<Point2D>> subpaths) {
+		double[] moments = HuMoments.getHuMoments(subpaths);
 		convertHuMoment(moments);
 		return moments[0];
 	}
@@ -35,9 +32,9 @@ public class MomentOperator {
 	 * (mu20+mu02)/m00^2 で面積正規化することで相似形を同一視する。
 	 * 注意：折り深さが異なる相似結果（例：大きな三角形と小さな三角形）も同一とみなされる。
 	 */
-	private static double _getMatchingValueSimilarity(ArrayList<Point2D> plist) {
+	private static double _getMatchingValueSimilarity(ArrayList<ArrayList<Point2D>> subpaths) {
 		HuMoments m = new HuMoments();
-		HuMoments.icvCoutourMoments(plist, m);  // icvCompleteMomentState も内部で呼ばれる
+		HuMoments.icvCoutourMoments(subpaths, m);  // icvCompleteMomentState も内部で呼ばれる
 		if (m.mu00 == 0) return 0;
 		double m00sq = m.mu00 * m.mu00;
 		double s = (m.mu20 + m.mu02) / m00sq;
@@ -58,29 +55,38 @@ public class MomentOperator {
 		}
 	}
 
-	// Pathから頂点のリストへ変換
-	private static ArrayList<Point2D> getPoint2DlistfromPathIterator(PathIterator pi) {
-
-		ArrayList<Point2D> ret = new ArrayList<Point2D>();
+	/**
+	 * Pathを、SEG_MOVETO単位で独立したサブパス（閉ループ）のリストへ変換する。
+	 * Areaは同一の輪郭でも面の合成順序によって複数のサブパスに分かれて表現されることがあり
+	 * （例：本来1つの領域が2個や5個のループとして返る）、以前はここで全サブパスを1本の
+	 * 点列に平坦化していたため、HuMoments側の周回積分が別ループの終点と始点を偽の辺で
+	 * つないでしまい、幾何学的に同一の輪郭でもモーメント値が大きくずれる不具合があった。
+	 */
+	private static ArrayList<ArrayList<Point2D>> getSubpaths(PathIterator pi) {
+		ArrayList<ArrayList<Point2D>> subpaths = new ArrayList<>();
+		ArrayList<Point2D> current = null;
 		Point2D m = null, p, q = new Point2D.Double(Double.MAX_VALUE, Double.MAX_VALUE);
 
 		double[] coords = new double[6];
 		while (!pi.isDone()) {
 			int type = pi.currentSegment(coords);
 			p = new Point2D.Double(coords[0], coords[1]);
-			if (p.distance(q) > 1.E-12) {
-				if (type == PathIterator.SEG_MOVETO) {
-					m = p;
-					ret.add(m);
-				} else if (type == PathIterator.SEG_LINETO) {
-					ret.add(p);
+			if (type == PathIterator.SEG_MOVETO) {
+				current = new ArrayList<>();
+				subpaths.add(current);
+				m = p;
+				current.add(m);
+				q = new Point2D.Double(Double.MAX_VALUE, Double.MAX_VALUE);
+			} else if (p.distance(q) > 1.E-12) {
+				if (type == PathIterator.SEG_LINETO) {
+					current.add(p);
 					q = p;
 				} else if (type == PathIterator.SEG_CLOSE) {
-					ret.add(new Point2D.Double(m.getX(), m.getY()));
+					current.add(new Point2D.Double(m.getX(), m.getY()));
 				}
 			}
 			pi.next();
 		}
-		return ret;
+		return subpaths;
 	}
 }

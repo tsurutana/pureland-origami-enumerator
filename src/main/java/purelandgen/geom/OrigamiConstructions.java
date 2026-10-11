@@ -187,6 +187,8 @@ public class OrigamiConstructions {
                 if (v0.p.epsilonEqual(v1.p)) continue;
                 FoldingLine line = new FoldingLine(v0.p, v1.p);
                 line.construction = OrigamiConstructions.PASSTHROUGH_2P;
+                line.p0SourceEdges = v0.sourceEdges;
+                line.p1SourceEdges = v1.sourceEdges;
                 lines.add(line);
             }
         }
@@ -209,6 +211,8 @@ public class OrigamiConstructions {
                 line.construction = OrigamiConstructions.PLACE_PtP;
                 line.landmark0 = new Vec2(v0.p);
                 line.landmark1 = new Vec2(v1.p);
+                line.landmark0SourceEdges = v0.sourceEdges;
+                line.landmark1SourceEdges = v1.sourceEdges;
                 lines.add(line);
             }
         }
@@ -290,6 +294,10 @@ public class OrigamiConstructions {
 
     private static int _addIntersections(Figure figure) {
         ArrayList<Vec2> newPoints = new ArrayList<>();
+        // Parallel to newPoints: the (exactly 2) existing-figure edges whose crossing produced
+        // that point, recorded inline (not re-derived afterward) so each new floating Vertex can
+        // remember exactly which edges it came from -- see Vertex.sourceEdges' javadoc.
+        ArrayList<Vec2[][]> newPointSourceEdges = new ArrayList<>();
         for (int i = 0, n = figure.edges.size(); i < n; i++) {
             Vec2 s0 = figure.edges.get(i).sv.p;
             Vec2 e0 = figure.edges.get(i).ev.p;
@@ -307,12 +315,20 @@ public class OrigamiConstructions {
                         if (cross.epsilonEqual(p)) { newlocation = false; break; }
                     }
                 }
-                if (newlocation)
+                if (newlocation) {
                     newPoints.add(cross);
+                    newPointSourceEdges.add(new Vec2[][]{
+                            {new Vec2(s0), new Vec2(e0)},
+                            {new Vec2(s1), new Vec2(e1)}});
+                }
             }
         }
-        for (Vec2 p : newPoints)
-            figure.vertices.add(new Vertex(p.x, p.y));
+        for (int k = 0; k < newPoints.size(); k++) {
+            Vec2 p = newPoints.get(k);
+            Vertex v = new Vertex(p.x, p.y);
+            v.sourceEdges = newPointSourceEdges.get(k);
+            figure.vertices.add(v);
+        }
         return newPoints.size();
     }
 }

@@ -7,9 +7,11 @@ public class GeomUtil {
 
     static final double EPS = 1.0e-8;
 
-    // Is p between s and e;
+    // Is p between s and e (with EPS tolerance -- a point on a degenerate axis-aligned
+    // bounding box, e.g. s==e, can have a sub-EPS floating-point residual on that axis from a
+    // Construction-computed intersection, which must still count as "in range").
     static boolean isRange(double p, double s, double e) {
-        return Math.min(s, e) <= p && p <= Math.max(s, e);
+        return Math.min(s, e) - EPS <= p && p <= Math.max(s, e) + EPS;
     }
     /** Bounding-box check only. Does NOT verify collinearity. */
     public static boolean isRange( Vec2 q, Vec2 p0, Vec2 p1 ) {
@@ -146,6 +148,12 @@ public class GeomUtil {
                 Vertex ret = new Vertex(x, y);
                 ret.index = -1; // Mark that this is a new point
                 ret.halfedge = he;
+                // s is the parameter along sp->ep (he.vertex.p -> he.next.vertex.p) in folded space.
+                // The face's folded<->original mapping is an isometry, so the same parameter applied
+                // to the endpoints' origP gives this new vertex's original (unfolded) position.
+                ret.origP = new Vec2(
+                        he.vertex.origP.x + s * (he.next.vertex.origP.x - he.vertex.origP.x),
+                        he.vertex.origP.y + s * (he.next.vertex.origP.y - he.vertex.origP.y));
                 return ret;
             }
         }
